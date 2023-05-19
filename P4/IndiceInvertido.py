@@ -13,182 +13,103 @@ class InvertIndex:
         self.tf = {}
         self.tfidf = {}
     
-    def building(self):       #Falta verificar si es que el indice ya existe. Si ya existe, no hacer nada
-        num_roots = 500
-        derivador = SnowballStemmer('spanish')
-        libros = ['libro1.txt', 'libro2.txt', 'libro3.txt','libro4.txt','libro5.txt','libro6.txt']
+    def building(self):
 
-        # Initialize a set for stopwords
-        stoplist = set()
+        if os.path.exists(self.index_file): #Si el índice ya fue creado, no hacer nada
+            pass
+        else:
+            num_roots = 500
+            derivador = SnowballStemmer('spanish')
+            libros = ['libro1.txt', 'libro2.txt', 'libro3.txt','libro4.txt','libro5.txt','libro6.txt']
 
-        # Read stop words from file into the set
-        with open('stoplist.txt', 'r',encoding='ISO-8859-1') as file:
-            stoplist = set(file.read().split('\n'))
+            # Initialize a set for stopwords
+            stoplist = set()
 
-        # Initialize defaultdict for tokens
-        tokens = defaultdict(set)
+            # Read stop words from file into the set
+            with open('stoplist.txt', 'r',encoding='ISO-8859-1') as file:
+                stoplist = set(file.read().split('\n'))
 
-
-        # Process each book
-        for file_id, archivo in enumerate(libros, start=1):
-            with open(archivo, 'r',encoding='ISO-8859-1') as file:
-                tokens_in_file = nltk.word_tokenize(file.read().lower())
-                tokens_in_file = [token for token in tokens_in_file if token.isalpha()]  # filter out non-alphanumeric characters
-                for token in tokens_in_file:
-                    root = derivador.stem(token)
-                    if root not in stoplist:
-                        tokens[root].add(file_id)
-
-        # Limit tokens to the 500 most frequent ones
-        tokens = dict(sorted(tokens.items(), key=lambda x: len(x[1]), reverse=True)[:num_roots])
-
-        # Sort the dictionary alphabetically
-        tokens = dict(sorted(tokens.items()))
+            # Initialize defaultdict for tokens
+            tokens = defaultdict(set)
 
 
-        # tf
-
-        tf = {
-            "libro1.txt": {},
-            "libro2.txt": {},
-            "libro3.txt": {},
-            "libro4.txt": {},
-            "libro5.txt": {},
-            "libro6.txt": {}
-        }
-
-        ## Cuanto cuántas veces aparece cada palabra en cada libro (TF)
-        for file_id, archivo in enumerate(libros, start=1):
-            with open(archivo, 'r',encoding='ISO-8859-1') as file:
-                tokens_in_file = nltk.word_tokenize(file.read().lower())
-                tokens_in_file = [token for token in tokens_in_file if token.isalpha()]
-                for token in tokens_in_file:
-                    if(token in tokens):
+            # Process each book
+            for file_id, archivo in enumerate(libros, start=1):
+                with open(archivo, 'r',encoding='ISO-8859-1') as file:
+                    tokens_in_file = nltk.word_tokenize(file.read().lower())
+                    tokens_in_file = [token for token in tokens_in_file if token.isalpha()]  # filter out non-alphanumeric characters
+                    for token in tokens_in_file:
                         root = derivador.stem(token)
-                        if root in tf[archivo]:
-                            tf[archivo][root] += 1
-                        else:
-                            tf[archivo][root] = 1
+                        if root not in stoplist:
+                            tokens[root].add(file_id)
 
-        # idf
-        idf = {}
-        for token in tokens:
-            idf[token] = np.log10(len(libros) / len(tokens[token])) #idf = log(numero total de documentos / numero de documentos en los que aparece la palabra)
+            # Limit tokens to the 500 most frequent ones
+            tokens = dict(sorted(tokens.items(), key=lambda x: len(x[1]), reverse=True)[:num_roots])
+
+            # Sort the dictionary alphabetically
+            tokens = dict(sorted(tokens.items()))
+
+
+            # tf
+
+            tf = {
+                "libro1.txt": {},
+                "libro2.txt": {},
+                "libro3.txt": {},
+                "libro4.txt": {},
+                "libro5.txt": {},
+                "libro6.txt": {}
+            }
+
+            ## Cuanto cuántas veces aparece cada palabra en cada libro (TF)
+            for file_id, archivo in enumerate(libros, start=1):
+                with open(archivo, 'r',encoding='ISO-8859-1') as file:
+                    tokens_in_file = nltk.word_tokenize(file.read().lower())
+                    tokens_in_file = [token for token in tokens_in_file if token.isalpha()]
+                    for token in tokens_in_file:
+                        if(token in tokens):
+                            root = derivador.stem(token)
+                            if root in tf[archivo]:
+                                tf[archivo][root] += 1
+                            else:
+                                tf[archivo][root] = 1
+
+            # idf
+            idf = {}
+            for token in tokens:
+                idf[token] = np.log10(len(libros) / len(tokens[token])) #idf = log(numero total de documentos / numero de documentos en los que aparece la palabra)
             
 
-        for doc in tf:
-            for word in tf[doc]:
-                tf[doc][word] = 1 + np.log10(tf[doc][word])
-        self.tf = tf
+            for doc in tf:
+                for word in tf[doc]:
+                    tf[doc][word] = 1 + np.log10(tf[doc][word])
+            self.tf = tf
 
 
-        self.idf = idf
+            self.idf = idf
 
-        # Calcular tf-idf
-        textos_tfidf = {}
-        for doc in tf:
-            textos_tfidf[doc] = {}
-            for word in tf[doc]:
-                #Producto punto entre escalares es el producto normal.
-                # No realizo producto entre arrays porque estoy usando diccionarios, pero es la misma idea
-                textos_tfidf[doc][word] = tf[doc][word] * idf[word] 
-
-        self.tfidf = textos_tfidf
-
-        # Escribo en el archivo index.txt el tf-idf de cada palabra en cada documento
-        with open(self.index_file, 'w',encoding='ISO-8859-1') as file:
-            for doc in self.tfidf:
-                for word in self.tfidf[doc]:
-                    file.write(f"{doc} {word} {self.tfidf[doc][word]}\n")
-        # if os.path.exists(self.index_file): #Si el índice ya fue creado, no hacer nada
-        #     pass
-        # else:
-        #     num_roots = 500
-        #     derivador = SnowballStemmer('spanish')
-        #     libros = ['libro1.txt', 'libro2.txt', 'libro3.txt','libro4.txt','libro5.txt','libro6.txt']
-
-        #     # Initialize a set for stopwords
-        #     stoplist = set()
-
-        #     # Read stop words from file into the set
-        #     with open('stoplist.txt', 'r',encoding='ISO-8859-1') as file:
-        #         stoplist = set(file.read().split('\n'))
-
-        #     # Initialize defaultdict for tokens
-        #     tokens = defaultdict(set)
+            # Guardo el idf en un archivo
+            with open('idf.txt', 'w',encoding='ISO-8859-1') as file:
+                for word in self.idf:
+                    file.write(f"{word} {self.idf[word]}\n")
 
 
-        #     # Process each book
-        #     for file_id, archivo in enumerate(libros, start=1):
-        #         with open(archivo, 'r',encoding='ISO-8859-1') as file:
-        #             tokens_in_file = nltk.word_tokenize(file.read().lower())
-        #             tokens_in_file = [token for token in tokens_in_file if token.isalpha()]  # filter out non-alphanumeric characters
-        #             for token in tokens_in_file:
-        #                 root = derivador.stem(token)
-        #                 if root not in stoplist:
-        #                     tokens[root].add(file_id)
+            # Calcular tf-idf
+            textos_tfidf = {}
+            for doc in tf:
+                textos_tfidf[doc] = {}
+                for word in tf[doc]:
+                    #Producto punto entre escalares es el producto normal.
+                    # No realizo producto entre arrays porque estoy usando diccionarios, pero es la misma idea
+                    textos_tfidf[doc][word] = tf[doc][word] * idf[word] 
 
-        #     # Limit tokens to the 500 most frequent ones
-        #     tokens = dict(sorted(tokens.items(), key=lambda x: len(x[1]), reverse=True)[:num_roots])
+            self.tfidf = textos_tfidf
 
-        #     # Sort the dictionary alphabetically
-        #     tokens = dict(sorted(tokens.items()))
-
-
-        #     # tf
-
-        #     tf = {
-        #         "libro1.txt": {},
-        #         "libro2.txt": {},
-        #         "libro3.txt": {},
-        #         "libro4.txt": {},
-        #         "libro5.txt": {},
-        #         "libro6.txt": {}
-        #     }
-
-        #     ## Cuanto cuántas veces aparece cada palabra en cada libro (TF)
-        #     for file_id, archivo in enumerate(libros, start=1):
-        #         with open(archivo, 'r',encoding='ISO-8859-1') as file:
-        #             tokens_in_file = nltk.word_tokenize(file.read().lower())
-        #             tokens_in_file = [token for token in tokens_in_file if token.isalpha()]
-        #             for token in tokens_in_file:
-        #                 if(token in tokens):
-        #                     root = derivador.stem(token)
-        #                     if root in tf[archivo]:
-        #                         tf[archivo][root] += 1
-        #                     else:
-        #                         tf[archivo][root] = 1
-
-        #     # idf
-        #     idf = {}
-        #     for token in tokens:
-        #         idf[token] = np.log10(len(libros) / len(tokens[token])) #idf = log(numero total de documentos / numero de documentos en los que aparece la palabra)
-            
-
-        #     for doc in tf:
-        #         for word in tf[doc]:
-        #             tf[doc][word] = 1 + np.log10(tf[doc][word])
-        #     self.tf = tf
-
-
-        #     self.idf = idf
-
-        #     # Calcular tf-idf
-        #     textos_tfidf = {}
-        #     for doc in tf:
-        #         textos_tfidf[doc] = {}
-        #         for word in tf[doc]:
-        #             #Producto punto entre escalares es el producto normal.
-        #             # No realizo producto entre arrays porque estoy usando diccionarios, pero es la misma idea
-        #             textos_tfidf[doc][word] = tf[doc][word] * idf[word] 
-
-        #     self.tfidf = textos_tfidf
-
-        #     # Escribo en el archivo index.txt el tf-idf de cada palabra en cada documento
-        #     with open(self.index_file, 'w',encoding='ISO-8859-1') as file:
-        #         for doc in self.tfidf:
-        #             for word in self.tfidf[doc]:
-        #                 file.write(f"{doc} {word} {self.tfidf[doc][word]}\n")
+            # Escribo en el archivo index.txt el tf-idf de cada palabra en cada documento
+            with open(self.index_file, 'w',encoding='ISO-8859-1') as file:
+                for doc in self.tfidf:
+                    for word in self.tfidf[doc]:
+                        file.write(f"{doc} {word} {self.tfidf[doc][word]}\n")
 
 
 
@@ -208,6 +129,13 @@ class InvertIndex:
         for word in tf_query:
             tf_query[word] = 1 + np.log10(tf_query[word])
 
+
+        # Leo el idf desde el archivo idf.txt
+        with open('idf.txt', 'r',encoding='ISO-8859-1') as file:
+            for line in file:
+                word, idf = line.split()
+                self.idf[word] = float(idf)
+
         # calcular el idf del query
         idf_query = {}
         for word in tf_query:
@@ -222,15 +150,14 @@ class InvertIndex:
             tfidf_query[word] = tf_query[word] * idf_query[word]
         
         # cargo el tf-idf desde el archivo index.txt
-        # with open(self.index_file, 'r',encoding='ISO-8859-1') as file:
-        #     for line in file:
-        #         doc, word, tfidf = line.split()
-        #         tfidf = float(tfidf)
-        #         if doc not in self.tfidf:
-        #             self.tfidf[doc] = {}
-        #         self.tfidf[doc][word] = tfidf
+        with open(self.index_file, 'r',encoding='ISO-8859-1') as file:
+            for line in file:
+                doc, word, tfidf = line.split()
+                tfidf = float(tfidf)
+                if doc not in self.tfidf:
+                    self.tfidf[doc] = {}
+                self.tfidf[doc][word] = tfidf
 
-        # print("tfidf_query: ", tfidf_query)
 
         # aplicar similitud de coseno y guardarlo en el diccionario score
         for doc in self.tfidf:
@@ -249,10 +176,8 @@ class InvertIndex:
 
         # 1. Obtengo las palabras de ambos documentos
         words = set(Q.keys()) | set(Doc.keys())
-
         # 2. Calculo el producto punto
         dot_product = sum(Q.get(word, 0) * Doc.get(word, 0) for word in words)
-
         # 3. Calculo las normas
         norm_Q = np.sqrt(sum(Q.get(word, 0) ** 2 for word in words))
         norm_Doc = np.sqrt(sum(Doc.get(word, 0) ** 2 for word in words))
